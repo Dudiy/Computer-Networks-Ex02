@@ -2,10 +2,6 @@
 
 void main()
 {
-	HttpRequest request = HttpRequest();
-	request.initFromString("GET /somedir/page.html HTTP/1.1\n		Host: www.someschool.edu\n		User - agent : Mozilla / 4.0\n		Connection : close\n		Accept - language : fr\n\nbody goes here");
-	cout << request.getURL();
-
 	// Initialize Winsock (Windows Sockets).
 
 	// Create a WSADATA object called wsaData.
@@ -157,11 +153,8 @@ void main()
 			{
 				// TODO change to if
 				nfd--;
-				switch (sockets[i].send)
-				{
-				case SEND:
+				if (sockets[i].send == SEND) {
 					sendMessage(i);
-					break;
 				}
 			}
 		}
@@ -183,17 +176,17 @@ bool addSocket(SOCKET id, int what)
 			sockets[i].recv = what;
 			sockets[i].send = IDLE;
 			sockets[i].len = 0;
+			//
+			// Set the socket to be in non-blocking mode.
+			//
+			unsigned long flag = 1;
+			if (ioctlsocket(id, FIONBIO, &flag) != 0)
+			{
+				cout << "Web Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+			}
 			socketsCount++;
 			return (true);
 		}
-	}
-	//
-	// Set the socket to be in non-blocking mode.
-	//
-	unsigned long flag = 1;
-	if (ioctlsocket(id, FIONBIO, &flag) != 0)
-	{
-		cout << "Web Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
 	}
 	return (false);
 }
@@ -254,31 +247,35 @@ void receiveMessage(int index)
 		cout << "Web Server: Recieved: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
 
 		sockets[index].len += bytesRecv;
+		HttpRequest request = HttpRequest();
+
 
 		if (sockets[index].len > 0)
-		{			
-			if (strncmp(sockets[index].buffer, "TimeString", 10) == 0)
+		{
+			size_t bytesParsed = request.initFromString(sockets[index].buffer);
+			memcpy(sockets[index].buffer, &sockets[index].buffer[bytesParsed], sockets[index].len - bytesParsed);
+			sockets[index].len -= bytesParsed;
+			sockets[index].send = SEND;
+			sockets[index].request = request;
+			if (!request.getMethod().compare("GET"))
+				sockets[index].sendMethod = GET;
+			else if (!request.getMethod().compare("PUT"))
+				sockets[index].sendMethod = PUT;
+			else if (!request.getMethod().compare("DELETE"))
+				sockets[index].sendMethod = _DELETE;
+			else if (!request.getMethod().compare("HEAD"))
+				sockets[index].sendMethod = HEAD;
+			else if (!request.getMethod().compare("OPTIONS"))
+				sockets[index].sendMethod = OPTIONS;
+			else if (!request.getMethod().compare("TRACE"))
+				sockets[index].sendMethod = TRACE;
+			/*else if (strncmp(sockets[index].buffer, "Exit", 4) == 0)
 			{
-				sockets[index].send = SEND;
-				sockets[index].sendSubType = SEND_TIME;
-				memcpy(sockets[index].buffer, &sockets[index].buffer[10], sockets[index].len - 10);
-				sockets[index].len -= 10;
-				return;
-			}
-			else if (strncmp(sockets[index].buffer, "SecondsSince1970", 16) == 0)
-			{
-				sockets[index].send = SEND;
-				sockets[index].sendSubType = SEND_SECONDS;
-				memcpy(sockets[index].buffer, &sockets[index].buffer[16], sockets[index].len - 16);
-				sockets[index].len -= 16;
-				return;
-			}
-			else if (strncmp(sockets[index].buffer, "Exit", 4) == 0)
-			{
+				sockets[index].send = IDLE;
 				closesocket(msgSocket);
 				removeSocket(index);
 				return;
-			}
+			}*/
 		}
 	}
 
@@ -287,21 +284,30 @@ void receiveMessage(int index)
 void sendMessage(int index)
 {
 	int bytesSent = 0;
-	char sendBuff[255];
-
+	char sendBuff[BUFF_SIZE];
+	HttpResponse response = HttpResponse();
 	SOCKET msgSocket = sockets[index].id;
-	if (sockets[index].sendSubType == SEND_TIME)
+	time_t timer;
+	time(&timer);
+	string currDate = ctime(&timer);
+	if (sockets[index].sendMethod == GET)
 	{
-		// Answer client's request by the current time string.
-
-		// Get the current time.
-		time_t timer;
-		time(&timer);
+		int dataSize = response.setDataFromFile(sockets[index].request.getURL());
+		if (dataSize > 0) {
+			response.setOkStatusLine();
+		}
+		else {
+			dataSize = response.setDataNotFound();
+			response.setStatusLine(404, "Not found");
+		}
+		response.addHeaderLine("Date", currDate);
+		response.addHeaderLine("Content-Length", to_string(dataSize));
+		response.addHeaderLine("Content-Type", "text/html");
+		response.addHeaderLine("Connection", "Closed");
 		// Parse the current time to printable string.
-		strcpy(sendBuff, ctime(&timer));
-		sendBuff[strlen(sendBuff) - 1] = 0; //to remove the new-line from the created string
+		strcpy(sendBuff, response.toString().c_str());		
 	}
-	else if (sockets[index].sendSubType == SEND_SECONDS)
+	else if (sockets[index].sendMethod == PUT)
 	{
 		// Answer client's request by the current time in seconds.
 
@@ -320,7 +326,7 @@ void sendMessage(int index)
 	}
 
 	cout << "Time Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
-
+	// TODO fix bug!
 	sockets[index].send = IDLE;
 }
 
