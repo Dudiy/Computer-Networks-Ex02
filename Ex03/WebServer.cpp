@@ -285,6 +285,7 @@ void sendMessage(int index)
 {
 	int bytesSent = 0;
 	char sendBuff[BUFF_SIZE];
+	HttpRequest request = sockets[index].request;
 	HttpResponse response = HttpResponse();
 	SOCKET msgSocket = sockets[index].id;
 	time_t timer;
@@ -292,7 +293,7 @@ void sendMessage(int index)
 	string currDate = ctime(&timer);
 	if (sockets[index].sendMethod == GET)
 	{
-		int dataSize = response.setDataFromFile(sockets[index].request.getURL());
+		int dataSize = response.setDataFromFile(request.getURL());
 		if (dataSize > 0) {
 			response.setOkStatusLine();
 		}
@@ -300,23 +301,36 @@ void sendMessage(int index)
 			dataSize = response.setDataNotFound();
 			response.setStatusLine(404, "Not found");
 		}
-		response.addHeaderLine("Date", currDate);
 		response.addHeaderLine("Content-Length", to_string(dataSize));
-		response.addHeaderLine("Content-Type", "text/html");
-		response.addHeaderLine("Connection", "Closed");
-		// Parse the current time to printable string.
-		strcpy(sendBuff, response.toString().c_str());		
+		// response.addHeaderLine("Date", currDate);
+		// response.addHeaderLine("Content-Type", "text/html");
+		// response.addHeaderLine("Connection", "Closed");
+		// // Parse the current time to printable string.
+		// strcpy(sendBuff, response.toString().c_str());		
 	}
 	else if (sockets[index].sendMethod == PUT)
 	{
-		// Answer client's request by the current time in seconds.
-
-		// Get the current time.
-		time_t timer;
-		time(&timer);
-		// Convert the number to string.
-		_itoa((int)timer, sendBuff, 10);
+		string absoluteFilePath = request.getUrl(); // TODO set absolute path
+		bool fileExisted = false;
+		ifstream f(name.c_str());
+		fileExisted = f.good();		
+		bool writeSucceded = writeDataToFile(absoluteFilePath, response);	
+		if (!writeSucceded){							
+			response.setStatusLine(404, "Not found");	
+		} else{			
+			if (fileExisted){
+				response.setStatusLine(200, "OK");	
+			} else {
+				response.setStatusLine(201, "Created");				
+			}		
+			response.addHeaderLine("Content-Location", request.getURL);
+		}
 	}
+	response.addHeaderLine("Date", currDate);
+	response.addHeaderLine("Content-Type", "text/html");
+	response.addHeaderLine("Connection", "Closed");
+	// Parse the current time to printable string.
+	strcpy(sendBuff, response.toString().c_str());	
 
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 	if (SOCKET_ERROR == bytesSent)
