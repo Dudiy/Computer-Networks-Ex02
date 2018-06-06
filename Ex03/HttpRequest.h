@@ -10,7 +10,6 @@ using namespace std;
 class HttpRequest
 {
 public:
-	HttpRequest();
 	HttpRequest(string i_RootPath);
 	int initFromString(string i_RequestStr);
 	string getMethod();
@@ -19,6 +18,7 @@ public:
 	map<string, string> getHeaders();
 	string getBody();
 	size_t getRequestLength();
+	string toString();
 private:
 	const char* m_RequestStr;
 	string m_RootPath;
@@ -27,7 +27,6 @@ private:
 	string m_Version = "";
 	map<string, string> m_Headers;
 	string m_Body = "";
-	size_t m_FullRequestLength = 0;
 	size_t getBodyStartIndex();
 	size_t getContentLength();
 };

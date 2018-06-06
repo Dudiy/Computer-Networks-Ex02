@@ -1,11 +1,11 @@
 #include "HttpRequest.h"
 
-HttpRequest::HttpRequest()
-{
-	char buf[256];
-	GetCurrentDirectoryA(256, buf);
-	HttpRequest(string(buf) + '\\');
-}
+//HttpRequest::HttpRequest()
+//{
+//	char buf[256];
+//	GetCurrentDirectoryA(256, buf);
+//	HttpRequest(string(buf) + '\\');
+//}
 
 HttpRequest::HttpRequest(string i_RootPath)
 {
@@ -16,8 +16,7 @@ int HttpRequest::initFromString(string i_RequestStr)
 {
 	m_RequestStr = i_RequestStr.c_str();
 	size_t bodyStartIndex = getBodyStartIndex();
-	size_t sizeParsed = 0;
-	HttpRequest parsedRequest = HttpRequest();
+	size_t sizeParsed = 0;	
 	size_t charsBetweenHeadersAndBody = 0;
 	char* requstStr = new char[i_RequestStr.length() + 1];
 	strcpy(requstStr, i_RequestStr.c_str());
@@ -74,6 +73,16 @@ map<string, string> HttpRequest::getHeaders()
 string HttpRequest::getBody()
 {
 	return m_Body;
+}
+
+size_t HttpRequest::getRequestLength()
+{
+	return strlen(m_RequestStr);
+}
+
+string HttpRequest::toString()
+{
+	return string(m_RequestStr);
 }
 
 size_t HttpRequest::getBodyStartIndex()

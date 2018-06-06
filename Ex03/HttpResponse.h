@@ -13,19 +13,15 @@ using namespace std;
 class HttpResponse
 {
 public:
-	HttpResponse();
 	HttpResponse(string i_RootPath);
 	string toString();
 	void setStatusLine(size_t i_StatusCode, string i_StatusPhrase, string i_Protocol = "HTTP/1.1");	
 	void setOkStatusLine();
 	void addHeaderLine(string i_Name, string i_Value);
-	size_t setData(string i_Data);	
-	size_t setDataNotFound();
-	size_t setDataFromFile(string i_Path);	
+	size_t setData(string i_Data);		
 	size_t getContentLength();
 private:	
-	string m_RootPath = string();
-	const string m_404FilePath = string("errorPage.html");
+	string m_RootPath = string();	
 	string m_Protocol = "";
 	string m_StatusCode = "";
 	string m_StatusPhrase = "";

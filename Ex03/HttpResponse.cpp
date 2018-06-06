@@ -1,16 +1,7 @@
 #include "HttpResponse.h"
 
-HttpResponse::HttpResponse()
-{
-	char buf[256];
-	//GetCurrentDirectoryA(256, buf); // TODO switch back to current dir	
-	//m_RootPath.append(string(buf) + "\\Root");
-	m_RootPath.append("D:\\School\\Year3\\Root");
-}
-
 HttpResponse::HttpResponse(string i_RootPath)
 {
-	//m_RootPath.append(i_RootPath + "\\Root");
 	m_RootPath.append("D:\\School\\Year3\\Root");
 }
 
@@ -50,39 +41,6 @@ size_t HttpResponse::setData(string i_Data)
 	m_Data = i_Data;
 	m_FullResponseLength += i_Data.length() + 2;
 	return m_Data.length();
-}
-
-size_t HttpResponse::setDataNotFound()
-{
-	return setDataFromFile(m_404FilePath);
-}
-
-size_t HttpResponse::setDataFromFile(string i_RelativePath = "index.html")
-{
-	ifstream resFile;
-	string line;
-	size_t bytesWritten = -1;
-	int pos;
-	if (!i_RelativePath.compare("/")) {
-		i_RelativePath = "/index.html";
-	}
-	while ((pos = i_RelativePath.find('/')) != string::npos) {
-		i_RelativePath.replace(pos,1, "\\");
-	}
-	string filePath = m_RootPath.append(i_RelativePath);
-	resFile.open(filePath);
-	if (resFile.is_open())
-	{
-		bytesWritten = 0;
-		while (getline(resFile, line))
-		{
-			m_Data.append(line);
-			bytesWritten += line.length();
-		}
-		resFile.close();
-	}
-
-	return bytesWritten;
 }
 
 size_t HttpResponse::getContentLength()

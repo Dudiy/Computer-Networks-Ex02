@@ -247,7 +247,7 @@ void receiveMessage(int index)
 		cout << "Web Server: Recieved: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
 
 		sockets[index].len += bytesRecv;
-		HttpRequest request = HttpRequest();
+		HttpRequest request = HttpRequest(ROOT_PATH);
 
 
 		if (sockets[index].len > 0)
@@ -286,51 +286,42 @@ void sendMessage(int index)
 	int bytesSent = 0;
 	char sendBuff[BUFF_SIZE];
 	HttpRequest request = sockets[index].request;
-	HttpResponse response = HttpResponse();
+	HttpResponse response = HttpResponse(ROOT_PATH);
 	SOCKET msgSocket = sockets[index].id;
 	time_t timer;
 	time(&timer);
 	string currDate = ctime(&timer);
-	if (sockets[index].sendMethod == GET)
+	switch (sockets[index].sendMethod)
 	{
-		int dataSize = response.setDataFromFile(request.getURL());
-		if (dataSize > 0) {
-			response.setOkStatusLine();
-		}
-		else {
-			dataSize = response.setDataNotFound();
-			response.setStatusLine(404, "Not found");
-		}
-		response.addHeaderLine("Content-Length", to_string(dataSize));
-		// response.addHeaderLine("Date", currDate);
-		// response.addHeaderLine("Content-Type", "text/html");
-		// response.addHeaderLine("Connection", "Closed");
-		// // Parse the current time to printable string.
-		// strcpy(sendBuff, response.toString().c_str());		
+	case GET:
+		handleGET(request, response);
+		break;
+	case PUT:
+		handlePUT(request, response);
+		break;
+	case _DELETE:
+		handleDELETE(request, response);
+		break;
+	case HEAD:
+		handleGET(request, response);
+		response.setData("");
+		break;
+	case OPTIONS:
+		response.setOkStatusLine();
+		response.addHeaderLine("ALLOW", METHODS);
+		response.addHeaderLine("Content-Length", "0");		
+		break;
+	case TRACE:
+		handleTRACE(request, response);
+		break;
+	default:
+		break;
 	}
-	else if (sockets[index].sendMethod == PUT)
-	{
-		string absoluteFilePath = request.getUrl(); // TODO set absolute path
-		bool fileExisted = false;
-		ifstream f(name.c_str());
-		fileExisted = f.good();		
-		bool writeSucceded = writeDataToFile(absoluteFilePath, response);	
-		if (!writeSucceded){							
-			response.setStatusLine(404, "Not found");	
-		} else{			
-			if (fileExisted){
-				response.setStatusLine(200, "OK");	
-			} else {
-				response.setStatusLine(201, "Created");				
-			}		
-			response.addHeaderLine("Content-Location", request.getURL);
-		}
-	}
+
 	response.addHeaderLine("Date", currDate);
-	response.addHeaderLine("Content-Type", "text/html");
 	response.addHeaderLine("Connection", "Closed");
 	// Parse the current time to printable string.
-	strcpy(sendBuff, response.toString().c_str());	
+	strcpy(sendBuff, response.toString().c_str());
 
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 	if (SOCKET_ERROR == bytesSent)
@@ -344,3 +335,136 @@ void sendMessage(int index)
 	sockets[index].send = IDLE;
 }
 
+void handleTRACE(HttpRequest &request, HttpResponse &response)
+{
+	string requestStr = request.toString();
+	response.setOkStatusLine();
+	response.setData(requestStr);
+	response.addHeaderLine("Content-Length", to_string(requestStr.length()));
+	response.addHeaderLine("Content-Type", "message/http");
+}
+
+void handleDELETE(HttpRequest &request, HttpResponse &response)
+{
+	string fileDeletedContents = deleteFile(request.getURL());
+	if (fileDeletedContents.length() > 0) {
+		response.setStatusLine(200, "OK");
+		response.setData(fileDeletedContents);
+		response.addHeaderLine("Content-Length", to_string(fileDeletedContents.length()));
+		response.addHeaderLine("Content-Type", "text/html");
+	}
+	else {
+		response.setStatusLine(404, "Not found");
+	}
+}
+
+void handlePUT(HttpRequest &request, HttpResponse &response)
+{
+	string responseBody = "File was created";
+	eFileWriteResult writeResult = writeStringToFile(request.getURL(), request.getBody());
+	switch (writeResult)
+	{
+	case FILE_CREATED:
+		response.setStatusLine(201, "Created");
+		break;
+	case FILE_MODIFIED:
+		response.setOkStatusLine();
+		break;
+	default:
+		response.setStatusLine(404, "Not found");
+		string responseData404 = readStringFromFile(PATH_404);
+		response.addHeaderLine("Content-Length", to_string(responseData404.length()));
+		response.setData(responseData404);
+		response.addHeaderLine("Content-Type", "text/html");
+		break;
+	}
+
+	if (writeResult != WRITE_FAILED) {
+		response.setData(responseBody);
+		response.addHeaderLine("Content-Length", to_string(responseBody.length()));
+		response.addHeaderLine("Content-Location", request.getURL());
+		response.addHeaderLine("Content-Type", "text");
+	}
+}
+
+void handleGET(HttpRequest &request, HttpResponse &response)
+{
+	string data = readStringFromFile(request.getURL());
+	if (data.length() > 0) {
+		response.setData(data);
+		response.setOkStatusLine();
+	}
+	else {
+		data = readStringFromFile(PATH_404);
+		response.setData(data);
+		response.setStatusLine(404, "Not found");
+	}
+	response.addHeaderLine("Content-Length", to_string(data.length()));
+	response.addHeaderLine("Content-Type", "text/html");
+}
+
+string convertRelPathToAbs(string i_RelativePath) {
+	int pos;
+	if (!i_RelativePath.compare("/")) {
+		i_RelativePath = "/index.html";
+	}
+	while ((pos = i_RelativePath.find('/')) != string::npos) {
+		i_RelativePath.replace(pos, 1, "\\");
+	}
+	return ROOT_PATH + i_RelativePath;
+}
+
+string readStringFromFile(string i_RelativePath) {
+	ifstream file;
+	string absPath = convertRelPathToAbs(i_RelativePath);
+	string fileContents = "";
+	string line;
+
+	file.open(absPath);
+	if (file.is_open())
+	{
+		while (getline(file, line))
+		{
+			fileContents.append(line);
+		}
+	}
+
+	file.close();
+	return fileContents;
+}
+
+eFileWriteResult writeStringToFile(string i_RelativePath, string i_ContentToWrite) {
+	ofstream file;
+	string absPath = convertRelPathToAbs(i_RelativePath);
+	string line;
+	eFileWriteResult writeResult;
+	try
+	{
+		// TODO file.good() returns true even if file doesnt exist
+		writeResult = file.good() ? FILE_MODIFIED : FILE_CREATED;
+		file.open(absPath);
+		if (!file.is_open())
+			throw exception("failed to open file");
+
+		file.write(i_ContentToWrite.c_str(), i_ContentToWrite.length());
+	}
+	catch (exception e)
+	{
+		writeResult = WRITE_FAILED;
+	}
+
+	file.close();
+	return writeResult;
+}
+
+string deleteFile(string i_RelativePath) {
+	string fileContents = readStringFromFile(i_RelativePath);
+	string absPath = convertRelPathToAbs(i_RelativePath);
+	remove(absPath.c_str());
+	return fileContents;
+}
+
+/* TODO
+	1. Delete created objects from memory
+	2. fix root location handling
+*/
