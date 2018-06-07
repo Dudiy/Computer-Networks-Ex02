@@ -125,6 +125,7 @@
   <ItemGroup>
     <ClInclude Include="HttpRequest.h" />
     <ClInclude Include="HttpResponse.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="WebServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

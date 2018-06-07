@@ -1,10 +1,5 @@
 #include "HttpResponse.h"
 
-HttpResponse::HttpResponse(string i_RootPath)
-{
-	m_RootPath.append("D:\\School\\Year3\\Root");
-}
-
 string HttpResponse::toString()
 {
 	string responseStr = string(m_Protocol + ' ' + m_StatusCode + ' ' + m_StatusPhrase + '\n');
@@ -25,11 +20,6 @@ void HttpResponse::setStatusLine(size_t i_StatusCode, string i_StatusPhrase, str
 	m_StatusPhrase = i_StatusPhrase;
 }
 
-void HttpResponse::setOkStatusLine()
-{
-	setStatusLine(200, "OK");
-}
-
 void HttpResponse::addHeaderLine(string i_Name, string i_Value)
 {
 	m_Headers.insert(pair<string, string>(i_Name, i_Value));
@@ -40,10 +30,5 @@ size_t HttpResponse::setData(string i_Data)
 {
 	m_Data = i_Data;
 	m_FullResponseLength += i_Data.length() + 2;
-	return m_Data.length();
-}
-
-size_t HttpResponse::getContentLength()
-{
 	return m_Data.length();
 }

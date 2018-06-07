@@ -2,24 +2,19 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <string>
 #include <map>
-#include <cctype>
-#include <math.h>
-#include <algorithm>
-#include <iostream>
-#include <fstream>
-#include <Windows.h>
 using namespace std;
 
 class HttpResponse
 {
 public:
-	HttpResponse(string i_RootPath);
+	HttpResponse(string i_RootPath) { m_RootPath.append("D:\\School\\Year3\\Root"); }
+	size_t getContentLength() const { return m_Data.length(); }
+	string getStatusCode() const { return m_StatusCode; };
+	void addHeaderLine(string i_Name, string i_Value);
+	void setOkStatusLine() { setStatusLine(200, "OK"); }
 	string toString();
 	void setStatusLine(size_t i_StatusCode, string i_StatusPhrase, string i_Protocol = "HTTP/1.1");	
-	void setOkStatusLine();
-	void addHeaderLine(string i_Name, string i_Value);
 	size_t setData(string i_Data);		
-	size_t getContentLength();
 private:	
 	string m_RootPath = string();	
 	string m_Protocol = "";
