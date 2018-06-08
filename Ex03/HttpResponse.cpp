@@ -6,7 +6,7 @@ string HttpResponse::toString()
 	for (auto itr = m_Headers.begin(); itr != m_Headers.end(); ++itr) {
 		responseStr.append(itr->first + ": " + itr->second + '\n');
 	}
-	responseStr.append(m_Data);
+	responseStr.append('\n' + m_Data);
 
 	return responseStr;
 }
@@ -22,6 +22,15 @@ void HttpResponse::setStatusLine(size_t i_StatusCode, string i_StatusPhrase, str
 
 void HttpResponse::addHeaderLine(string i_Name, string i_Value)
 {
+	int pos;
+	while ((pos = i_Name.find('\n')) != string::npos)
+	{
+		i_Name.erase(pos, 1);
+	}
+	while ((pos = i_Value.find('\n')) != string::npos)
+	{
+		i_Value.erase(pos, 1);
+	}
 	m_Headers.insert(pair<string, string>(i_Name, i_Value));
 	m_FullResponseLength += i_Name.length() + 2 + i_Value.length() + 1;
 }

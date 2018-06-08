@@ -1,5 +1,6 @@
 #include "WebServer.h"
 
+
 void main()
 {
 	WSAData wsaData;
@@ -37,7 +38,9 @@ void main()
 		return;
 	}
 
+	createRootFolder();
 	addSocket(listenSocket, LISTEN);
+	cout << "Web Server: Listening on port " << WEB_SERVER_PORT << endl;
 	while (true)
 	{
 		fd_set waitRecv;
@@ -56,7 +59,8 @@ void main()
 				FD_SET(sockets[i].id, &waitSend);
 		}
 
-		int nfd = select(0, &waitRecv, &waitSend, NULL, NULL);
+		const timeval timeout = {SOCKET_TIMEOT, 0};
+		int nfd = select(0, &waitRecv, &waitSend, NULL, &timeout);
 		if (nfd == SOCKET_ERROR)
 		{
 			cout << "Web Server: Error at select(): " << WSAGetLastError() << endl;
@@ -64,10 +68,23 @@ void main()
 			return;
 		}
 
+		time_t currTime;
+		time(&currTime);
+		for (int i = 0; i < MAX_SOCKETS; i++)
+		{
+			if (sockets[i].recv != EMPTY && sockets[i].recv != LISTEN && currTime - sockets[i].lastActiveTimeStamp >
+				SOCKET_TIMEOT)
+			{
+				cout << "Web Server: Socket " << i << " has timed out." << endl;
+				removeSocket(i);
+			}
+		}
+
 		for (int i = 0; i < MAX_SOCKETS && nfd > 0; i++)
 		{
 			if (FD_ISSET(sockets[i].id, &waitRecv))
 			{
+				time(&sockets[i].lastActiveTimeStamp);
 				nfd--;
 				switch (sockets[i].recv)
 				{
@@ -78,7 +95,7 @@ void main()
 				case RECEIVE:
 					receiveMessage(i);
 					break;
-				default: 
+				default:
 					break;
 				}
 			}
@@ -88,6 +105,7 @@ void main()
 		{
 			if (FD_ISSET(sockets[i].id, &waitSend))
 			{
+				time(&sockets[i].lastActiveTimeStamp);
 				nfd--;
 				if (sockets[i].send == SEND)
 				{
@@ -113,9 +131,8 @@ bool addSocket(SOCKET id, int what)
 			sockets[i].recv = what;
 			sockets[i].send = IDLE;
 			sockets[i].len = 0;
-			//
-			// Set the socket to be in non-blocking mode.
-			//
+			time(&sockets[i].lastActiveTimeStamp);
+			// Set the socket to be in non-blocking mode.			
 			unsigned long flag = 1;
 			if (ioctlsocket(id, FIONBIO, &flag) != 0)
 			{
@@ -133,6 +150,7 @@ void removeSocket(int index)
 	sockets[index].recv = EMPTY;
 	sockets[index].send = EMPTY;
 	socketsCount--;
+	cout << "Web Server: Socket " << index << " has been removed." << endl;
 }
 
 void acceptConnection(int index)
@@ -147,7 +165,8 @@ void acceptConnection(int index)
 		cout << "Web Server: Error at accept(): " << WSAGetLastError() << endl;
 		return;
 	}
-	cout << "Web Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." <<
+	cout << "Web Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) <<
+		" is connected to socket " << index << "." <<
 		endl;
 
 
@@ -176,7 +195,7 @@ void receiveMessage(int index)
 	if (bytesRecv == 0)
 	{
 		closesocket(msgSocket);
-		removeSocket(index);		
+		removeSocket(index);
 	}
 	else
 	{
@@ -207,13 +226,6 @@ void receiveMessage(int index)
 				sockets[index].sendMethod = OPTIONS;
 			else if (!request.getMethod().compare("TRACE"))
 				sockets[index].sendMethod = TRACE;
-			/*else if (strncmp(sockets[index].buffer, "Exit", 4) == 0)
-			{
-				sockets[index].send = IDLE;
-				closesocket(msgSocket);
-				removeSocket(index);
-				return;
-			}*/
 		}
 	}
 }
@@ -255,23 +267,26 @@ void sendMessage(int index)
 		break;
 	}
 
+	response.addHeaderLine("Server", "Dudi's amazing server");
 	response.addHeaderLine("Date", currDate);
 	response.addHeaderLine("Connection", "Closed");
-	// Parse the current time to printable string.
 	strcpy(sendBuff, response.toString().c_str());
 
 	int bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 	if (SOCKET_ERROR == bytesSent)
 	{
-		cout << "Time Server: Error at send(): " << WSAGetLastError() << endl;
+		cout << "Web Server: Error at send(): " << WSAGetLastError() << endl;
 		return;
 	}
 
-	cout << "Time Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff <<
-		"\" message.\n";	
-	
-	// TODO fix bug!
-	sockets[index].send = IDLE;
+	cout << "Web Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff <<
+		"\" message.\n";
+
+	// set state to idle only if the buffer is now empty
+	if (sockets[index].len == 0 || strlen(sockets[index].buffer) == 0)
+	{
+		sockets[index].send = IDLE;
+	}
 }
 
 void handleGET(HttpRequest& i_Request, HttpResponse& i_Response)
@@ -281,12 +296,12 @@ void handleGET(HttpRequest& i_Request, HttpResponse& i_Response)
 	{
 		i_Response.setData(data);
 		i_Response.setOkStatusLine();
+		i_Response.addHeaderLine("Content-Length", to_string(data.length()));
 	}
 	else
 	{
-		set404Response(i_Response);
+		i_Response.setStatusLine(404, "Not found");
 	}
-	i_Response.addHeaderLine("Content-Length", to_string(data.length()));
 	i_Response.addHeaderLine("Content-Type", "text/html");
 }
 
@@ -337,7 +352,7 @@ void handleDELETE(HttpRequest& i_Request, HttpResponse& i_Response)
 	}
 	else
 	{
-		set404Response(i_Response);		
+		set404Response(i_Response);
 	}
 }
 
@@ -420,7 +435,12 @@ string deleteFile(const string i_RelativePath)
 	return fileContents;
 }
 
-/* TODO
-	1. Delete created objects from memory
-	2. fix root location handling
-*/
+void createRootFolder()
+{
+	if (CreateDirectory(ROOT_PATH.c_str(), NULL))
+	{
+		writeStringToFile("/index.html", htmlString_index);
+		writeStringToFile("/errorPage.html", htmlString_404);
+		cout << "Web Server: Created root folder with index.html and errorPage.html" << endl;
+	}
+}

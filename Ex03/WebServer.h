@@ -47,15 +47,19 @@ struct SocketState
 	int	send;			// Sending?
 	eMethod sendMethod;	// Sending sub-type
 	char buffer[BUFF_SIZE];
+	time_t lastActiveTimeStamp;
 	HttpRequest request = HttpRequest(ROOT_PATH);
 	int len;
 };
 
 const int WEB_SERVER_PORT = 8080;
+const int SOCKET_TIMEOT = 120;
 const int MAX_SOCKETS = 60;
 const string PATH_404 = string("/errorPage.html");
 const string htmlString_404 = string("<html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>");
+const string htmlString_index = string("<html><head><title>Hello</title></head><body><h1>Hello world :)</h1></body></html>");
 
+void createRootFolder();
 bool addSocket(SOCKET id, int what);
 void removeSocket(int index);
 void acceptConnection(int index);
